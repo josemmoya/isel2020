@@ -1,5 +1,6 @@
 #include "task.h"
 #include "fsm.h"
+#include "fsm_kbd.h"
 #include <sys/select.h>
 #include <sys/time.h>
 #include <stdlib.h>
@@ -14,8 +15,8 @@ delay_until (struct timeval* next_activation)
   select (0, NULL, NULL, NULL, &timeout);
 }
 
-int temp;
-pthread_mutex_t m_temp;
+static int temp;
+static pthread_mutex_t m_temp;
 
 static int* sample_temp;
 static int* send_temp;
@@ -43,7 +44,7 @@ static int send_activated(fsm_t* this) {
 static void send_sample (fsm_t* this) { 
 	static struct timeval period = { 10, 0 };
 	pthread_mutex_lock (&m_temp);
-	printf ("send: %d\n", *send_temp); 
+	printf ("send: %d\r\n", *send_temp); 
 	pthread_mutex_unlock (&m_temp);
 	timeval_add (&next_send, &next_send, &period);
 }
@@ -82,9 +83,10 @@ sample_func (void* arg)
 
   gettimeofday (&next, NULL);
   while (1) {
-    delay_until (&next_sample);
+    delay_until (&next);
     timeval_add (&next, &next, period);
 
+    printf ("sample\r\n");
     fsm_fire (fsm_sample);
   }
 }
@@ -100,10 +102,32 @@ send_func (void* arg)
 
   gettimeofday (&next, NULL);
   while (1) {
-    delay_until (&next_sample);
+    delay_until (&next);
     timeval_add (&next, &next, period);
 
+    printf ("send\r\n");
     fsm_fire (fsm_send);
+  }
+}
+
+
+
+void
+kbd_loop (void)
+{
+  static int cnt;
+  fsm_t* fsm_kbd = fsm_new_kbd();
+  struct timeval period = { 1, 0 * 1000 };
+  struct timeval next;
+
+  gettimeofday (&next, NULL);
+  while (1) {
+    delay_until (&next);
+    timeval_add (&next, &next, &period);
+
+    cnt = (cnt + 1) % 25;
+    if (!cnt) printf ("kbd * 25\r\n");
+    fsm_fire (fsm_kbd);
   }
 }
 
@@ -111,12 +135,11 @@ send_func (void* arg)
 int
 main ()
 {
-  pthread_t tid_sample;
-  pthread_t tid_send;
+  pthread_t tid_sample, tid_send, tid_kbd;
   mutex_init (&m_temp, 2);
   tid_sample = task_new ("sample", sample_func, 5000, 5000, 2, 1024);
   tid_send = task_new ("send", send_func, 5000, 5000, 1, 1024);
-  pthread_join (tid_sample, NULL);
+  kbd_loop();
   return 0;
 }
 
