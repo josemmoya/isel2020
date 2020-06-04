@@ -1,5 +1,6 @@
 #include "reactor.h"
 #include "fsm.h"
+#include "fsm_kbd.h"
 #include <sys/select.h>
 #include <sys/time.h>
 #include <stdlib.h>
@@ -37,7 +38,7 @@ static int send_activated(fsm_t* this) {
 }
 static void send_sample (fsm_t* this) { 
 	static struct timeval period = { 10, 0 };
-	printf ("send: %d\n", *send_temp); 
+	printf ("send: %d\r\n", *send_temp); 
 	timeval_add (&next_send, &next_send, &period);
 }
 
@@ -65,9 +66,10 @@ fsm_new_send(int* temp)
 	return fsm_new(tt);
 }
 
-int temp;
-fsm_t* fsm_sample;
-fsm_t* fsm_send;
+static int temp;
+static fsm_t* fsm_sample;
+static fsm_t* fsm_send;
+static fsm_t* fsm_kbd;
 
 static
 void
@@ -87,21 +89,34 @@ send_func (struct event_handler_t* this)
   timeval_add (&this->next_activation, &this->next_activation, &period);
 }
 
+static
+void
+kbd_func (struct event_handler_t* this)
+{
+  static const struct timeval period = { 0, 200 * 1000 };
+  fsm_fire (fsm_kbd); 
+  timeval_add (&this->next_activation, &this->next_activation, &period);
+}
+
 
 int
 main ()
 {
-  EventHandler eh_sample, eh_send;
+  EventHandler eh_sample, eh_send, eh_kbd;
   reactor_init ();
 
   fsm_sample = fsm_new_sample(&temp);
   fsm_send = fsm_new_send(&temp);
+  fsm_kbd = fsm_new_kbd();
 
   event_handler_init (&eh_sample, 2, sample_func);
   reactor_add_handler (&eh_sample);
 
   event_handler_init (&eh_send, 1, send_func);
   reactor_add_handler (&eh_send);
+
+  event_handler_init (&eh_kbd, 1, kbd_func);
+  reactor_add_handler (&eh_kbd);
 
   while (1) {
     reactor_handle_events ();

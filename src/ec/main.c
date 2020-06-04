@@ -1,4 +1,5 @@
 #include "fsm.h"
+#include "fsm_kbd.h"
 #include <sys/select.h>
 #include <sys/time.h>
 #include <stdlib.h>
@@ -67,7 +68,7 @@ static int send_activated(fsm_t* this) {
 }
 static void send_sample (fsm_t* this) { 
 	static struct timeval period = { 10, 0 };
-	printf ("send: %d\n", *send_temp); 
+	printf ("send: %d\r\n", *send_temp); 
 	timeval_add (&next_send, &next_send, &period);
 }
 
@@ -97,16 +98,18 @@ fsm_new_send(int* temp)
 
 int main () 
 {
-	struct timeval period = { 5, 0 };
+	struct timeval period = { 0, 200 * 1000 };
 	struct timeval next;
 	int temp;
 	fsm_t* fsm_sample = fsm_new_sample(&temp);
 	fsm_t* fsm_send = fsm_new_send(&temp);
+	fsm_t* fsm_kbd = fsm_new_kbd();
 
 	gettimeofday(&next, NULL);
 	while (1) {
 		fsm_fire (fsm_sample);
 		fsm_fire (fsm_send);
+		fsm_fire (fsm_kbd);
 		timeval_add (&next, &next, &period);
 		delay_until (&next);
 	}
